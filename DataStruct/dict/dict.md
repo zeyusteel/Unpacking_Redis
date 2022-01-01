@@ -98,7 +98,7 @@ typedef struct dictht {
 
 # scan
 redis中的`dictScan`可以保证
-- 不出现重复数据
+- 减少出现重复数据
 - 不遗漏数据
 以上主要是基于`rehash`情况下考虑的,hash表的扩缩后的大小总是2^N
 
@@ -123,7 +123,27 @@ redis中的`dictScan`可以保证
 假设扩容前有效位为m，扩容后有效位则为m+1。 
 ![节点扩容遍历顺序](resource/4-8-16.png)
 
-以上是遍历 -> rehash -> 遍历，还有一种情况是遍历中rehash还未完成......
+以上是遍历 -> rehash -> 遍历，还有一种情况是遍历中rehash还未完成
+
+```c
+    do {
+        /* Emit entries at cursor */
+        // 指向桶，并迭代桶中的所有节点
+        de = t1->table[v & m1];
+        while (de) {
+            fn(privdata, de);
+            de = de->next;
+        }
+
+        /* Increment bits not covered by the smaller mask */
+        //给v的扩展的有效位的高位不断+1
+        v = (((v | m0) + 1) & ~m0) | (v & m0);
+
+        /* Continue while bits covered by mask difference is non-zero */
+    } while (v & (m0 ^ m1));v的高位没有1了
+```
+假设t0到t1大小从8变化到64之后，原来在0号slot的元素可能会迁移到了0, 8, 16, 24,32,48,56这几个t1的slot中。所以我们需要扫描这几个槽位，一次将其返回给客户端
+
 
 ## API
 ![api](resource/api.png)
