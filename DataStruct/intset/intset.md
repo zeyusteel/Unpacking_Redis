@@ -43,6 +43,7 @@ typedef struct intset {
         }
     }
 ```
+![api](resource/inset-api.png)
 
 ## 随记
 - `memrev16`,`intrev16`,调整大小端存储方式，默认是小端存储
