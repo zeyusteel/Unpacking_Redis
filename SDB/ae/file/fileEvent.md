@@ -61,3 +61,47 @@ typedef struct aeFileEvent {
 ## 文件事件分配器
 `aeProcessEvents`  //处理所有已到达的时间事件，以及所有已就绪的文件事件。
 
+## 文件事件处理器
+
+- 链接应答处理器 `acceptTcpHandler`
+- 命令请求处理器 `readQueryFromClient`
+- 命令回复处理器 `sendReplyToClient`
+
+流程：
+1. io多路复用监听所有fd，当有客户端`connect`，触发**链接应答处理器**执行`accept`
+```c
+    // 为 TCP 连接关联连接应答（accept）处理器
+    // 用于接受并应答客户端的 connect() 调用
+    for (j = 0; j < server.ipfd_count; j++) {
+        if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
+            acceptTcpHandler,NULL) == AE_ERR)
+            {
+                redisPanic(
+                    "Unrecoverable error creating server.ipfd file event.");
+            }
+    }
+```
+
+2. `accept`后会创建客户端套接字，监听这个套接字,当客户端发送命令，触发**命令请求处理器**接收命令
+
+```c
+        // 绑定读事件到事件 loop （开始接收命令请求）
+        if (aeCreateFileEvent(server.el,fd,AE_READABLE,
+            readQueryFromClient, c) == AE_ERR)
+        {
+            close(fd);
+            zfree(c);
+            return NULL;
+        }
+```
+
+3. 当客户端准备好时，返回给客户端执行结果
+```c
+    // 一般情况，为客户端套接字安装写处理器到事件循环
+    if (c->bufpos == 0 && listLength(c->reply) == 0 &&
+        (c->replstate == REDIS_REPL_NONE ||
+         c->replstate == REDIS_REPL_ONLINE) &&
+        aeCreateFileEvent(server.el, c->fd, AE_WRITABLE,
+        sendReplyToClient, c) == AE_ERR) return REDIS_ERR;
+
+```
