@@ -15,7 +15,7 @@ struct sdshdr {
     int free;
 
     // 数据空间
-    char buf[];     //数组指针，不占用存储空间
+    char buf[];     //0长度数组，不占用存储空间
 };
 ```
 特点:
@@ -38,16 +38,21 @@ struct sdshdr {
 ***
 
 ### 6.2.6
+在旧版本的基础上根据不同的`buf`长度采用不同长度的`alloc`,`len`去表示，这样进一步节约内存
 ```c
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
  * However is here to document the layout of type 5 SDS strings. */
 struct __attribute__ ((__packed__)) sdshdr5 {
-    unsigned char flags; /* 3 lsb of type, and 5 msb of string length */
+    //低三位存放类型，高五位存放长度，能表示0～31的buf长度,取消了字节对齐，直接通过`sds s[-1]` 就能定位到`flags`
+    unsigned char flags; /* 3 lsb of type, and 5 msb of string length */ 
     char buf[];
 };
 struct __attribute__ ((__packed__)) sdshdr8 {
+    //使用的长度
     uint8_t len; /* used */
+    //buf总分配的长度
     uint8_t alloc; /* excluding the header and null terminator */
+    //flags只表示类型
     unsigned char flags; /* 3 lsb of type, 5 unused bits */
     char buf[];
 };
